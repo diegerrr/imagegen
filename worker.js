@@ -1,4 +1,4 @@
-import { AutoProcessor, MultiModalityCausalLM, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0';
+import { AutoProcessor, MultiModalityCausalLM, RawImage, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0';
 
 let processor, model;
 
@@ -17,20 +17,35 @@ self.onmessage = async (e) => {
             if (!model) {
                 const model_id = "onnx-community/Janus-1.3B-ONNX";
                 const progress_callback = (p) => {
-                    if (p.status === 'progress') {
-                        self.postMessage({ type: 'progress', percent: p.progress.toFixed(1) });
-                    }
+                    if (p.status === 'progress') self.postMessage({ type: 'progress', percent: p.progress.toFixed(1) });
                 };
                 processor = await AutoProcessor.from_pretrained(model_id, { progress_callback });
                 model = await MultiModalityCausalLM.from_pretrained(model_id, { device: 'webgpu', progress_callback });
             }
 
-            self.postMessage({ type: 'status', message: 'Generating...' });
-            const inputs = await processor(data.prompt, { chat_template: "text_to_image" });
-            const outputs = await model.generate_images({ ...inputs, max_new_tokens: 576 });
+            self.postMessage({ type: 'status', message: 'Processing...' });
 
-            const blob = await outputs[0].toBlob();
-            self.postMessage({ type: 'done', blob });
+            if (data.prompt.startsWith('/draw')) {
+                // DRAW MODE
+                const cleanPrompt = data.prompt.replace('/draw', '').trim();
+                const inputs = await processor(cleanPrompt, { chat_template: "text_to_image" });
+                const outputs = await model.generate_images({ ...inputs, max_new_tokens: 576 });
+                const blob = await outputs[0].toBlob();
+                self.postMessage({ type: 'done', mode: 'image', blob });
+            } else if (data.image) {
+                // VISION MODE
+                const rawImg = await RawImage.fromBlob(data.image);
+                const inputs = await processor({ text: data.prompt || "Describe this image.", images: [rawImg] });
+                const outputs = await model.generate({ ...inputs, max_new_tokens: 128 });
+                const text = processor.batch_decode(outputs, { skip_special_tokens: true });
+                self.postMessage({ type: 'done', mode: 'text', text: text[0] });
+            } else {
+                // CHAT MODE
+                const inputs = await processor(data.prompt);
+                const outputs = await model.generate({ ...inputs, max_new_tokens: 128 });
+                const text = processor.batch_decode(outputs, { skip_special_tokens: true });
+                self.postMessage({ type: 'done', mode: 'text', text: text[0] });
+            }
         } catch (err) { self.postMessage({ type: 'status', message: 'Error: ' + err.message }); }
     }
 };
