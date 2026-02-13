@@ -1,8 +1,8 @@
-// main.js
+// main.js - Diego's Multimodal Assistant (Final Version)
 const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
 
-// We wait for the DOM to be ready to avoid "null" errors
 window.addEventListener('DOMContentLoaded', () => {
+    // 1. Link all HTML elements
     const history = document.getElementById('chat-history');
     const input = document.getElementById('chat-input');
     const sendBtn = document.getElementById('send-btn');
@@ -14,7 +14,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     let pendingImage = null;
 
-    // UI Message Handler
+    // 2. Helper to add messages to the chat UI
     function addMessage(role, content, isImage = false) {
         const div = document.createElement('div');
         div.className = `msg ${role}`;
@@ -24,15 +24,16 @@ window.addEventListener('DOMContentLoaded', () => {
             img.src = URL.createObjectURL(content);
             img.style.maxWidth = "100%";
             img.style.borderRadius = "8px";
-            div.innerHTML = `<strong>AI Generated:</strong><br>`;
+            div.innerHTML = `<strong>AI Generated Art:</strong><br>`;
             div.appendChild(img);
             
-            // Download link for the generated image
             const dl = document.createElement('a');
             dl.href = img.src;
             dl.download = 'diego-ai-art.png';
-            dl.innerText = ' [Download]';
-            dl.style.color = '#28a745';
+            dl.innerText = ' [Download PNG]';
+            dl.style.display = "block";
+            dl.style.marginTop = "5px";
+            dl.style.color = "#28a745";
             div.appendChild(dl);
         } else {
             div.innerText = content;
@@ -41,42 +42,57 @@ window.addEventListener('DOMContentLoaded', () => {
         history.scrollTop = history.scrollHeight;
     }
 
-    // Folder Logic
+    // 3. Local Model Folder Logic
     folderBtn.onclick = async () => {
         try {
             const handle = await window.showDirectoryPicker();
             status.innerText = "Linked: " + handle.name;
             worker.postMessage({ type: 'load_local', handle });
-        } catch (e) { status.innerText = "Access denied."; }
+        } catch (e) {
+            status.innerText = "Local folder access cancelled.";
+        }
     };
 
-    // Upload Logic
+    // 4. Image Upload Logic (With Safety Guard)
     document.getElementById('upload-btn').onclick = () => uploadInput.click();
     uploadInput.onchange = (e) => {
-        pendingImage = e.target.files[0];
-        status.innerText = `Ready: ${pendingImage.name}`;
+        if (e.target.files && e.target.files.length > 0) {
+            pendingImage = e.target.files[0];
+            status.innerText = `Image ready: ${pendingImage.name}`;
+        } else {
+            pendingImage = null;
+            status.innerText = "No image selected.";
+        }
     };
 
-    // Send Logic
+    // 5. Send Logic
     sendBtn.onclick = () => {
         const text = input.value.trim();
         if (!text && !pendingImage) return;
 
-        addMessage('user', text || "Shared an image");
+        // Show user message in chat
+        addMessage('user', text || "Sent an image for analysis");
         sendBtn.disabled = true;
         
-        worker.postMessage({ type: 'generate', prompt: text, image: pendingImage });
+        worker.postMessage({ 
+            type: 'generate', 
+            prompt: text, 
+            image: pendingImage 
+        });
+        
+        // Reset inputs
         input.value = '';
         pendingImage = null;
     };
 
-    // Worker Listener
+    // 6. Worker Response Logic
     worker.onmessage = (e) => {
         const data = e.data;
+        
         if (data.type === 'progress') {
             progressContainer.style.display = 'block';
             progressBar.style.width = data.percent + '%';
-            status.innerText = `Downloading: ${data.percent}%`;
+            status.innerText = `Downloading Model: ${data.percent}%`;
         } else if (data.type === 'status') {
             status.innerText = data.message;
             if (data.message === 'Processing...') progressContainer.style.display = 'none';
