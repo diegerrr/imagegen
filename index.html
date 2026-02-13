@@ -2,29 +2,34 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Diego's AI Studio</title>
+    <title>Diego's AI Image Studio</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #121212; color: white; display: flex; flex-direction: column; align-items: center; padding: 40px; }
         .container { background: #1e1e1e; padding: 30px; border-radius: 15px; width: 100%; max-width: 500px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        input { width: 85%; padding: 12px; border-radius: 8px; border: 1px solid #333; background: #2b2b2b; color: white; margin-bottom: 20px; }
-        .btn-group { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
-        button { padding: 10px 20px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        #gen-btn { background: #007bff; color: white; }
-        #folder-btn { background: #6c757d; color: white; }
-        #dl-btn { background: #28a745; color: white; display: none; }
-        #status { margin-top: 20px; color: #888; font-size: 0.9em; }
-        canvas { margin-top: 20px; border-radius: 10px; display: none; background: #000; }
+        input { width: 85%; padding: 12px; border-radius: 8px; border: 1px solid #333; background: #2b2b2b; color: white; margin-bottom: 20px; outline: none; }
+        .btn-group { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
+        button { padding: 10px 20px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; color: white; }
+        #gen-btn { background: #007bff; }
+        #folder-btn { background: #6c757d; }
+        #dl-btn { background: #28a745; opacity: 0.5; cursor: not-allowed; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        /* Progress Bar Styles */
+        #progress-container { width: 100%; background: #333; border-radius: 10px; height: 12px; margin: 15px 0; display: none; overflow: hidden; }
+        #progress-bar { width: 0%; height: 100%; background: #007bff; transition: width 0.3s ease; }
+        #status { color: #888; font-size: 0.9em; margin-top: 10px; }
+        canvas { margin-top: 20px; border-radius: 10px; display: none; background: #000; border: 1px solid #333; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>AI Image Studio</h1>
-        <input type="text" id="prompt" placeholder="A futuristic city in the clouds...">
+        <input type="text" id="prompt" placeholder="A futuristic wall street with golden charts...">
         <div class="btn-group">
             <button id="gen-btn">Generate</button>
             <button id="folder-btn">📂 Link Local Folder</button>
-            <button id="dl-btn">Download</button>
+            <button id="dl-btn" disabled>Download</button>
         </div>
+        <div id="progress-container"><div id="progress-bar"></div></div>
         <div id="status">Ready (WebGPU)</div>
         <canvas id="canvas" width="384" height="384"></canvas>
     </div>

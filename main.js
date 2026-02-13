@@ -4,49 +4,57 @@ const genBtn = document.getElementById('gen-btn');
 const folderBtn = document.getElementById('folder-btn');
 const dlBtn = document.getElementById('dl-btn');
 const status = document.getElementById('status');
+const progressBar = document.getElementById('progress-bar');
+const progressContainer = document.getElementById('progress-container');
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 
-// 1. Handle Local Folder Linking
+let currentImgURL = null;
+
 folderBtn.onclick = async () => {
     try {
         const handle = await window.showDirectoryPicker();
         status.innerText = "Linked: " + handle.name;
         worker.postMessage({ type: 'load_local', handle });
-    } catch (e) { status.innerText = "Folder selection cancelled."; }
+    } catch (e) { status.innerText = "Cancelled."; }
 };
 
-// 2. Handle Generation
 genBtn.onclick = () => {
     const text = promptInput.value.trim();
     if (!text) return;
     genBtn.disabled = true;
-    dlBtn.style.display = 'none';
-    status.innerText = "Initializing AI...";
+    dlBtn.disabled = true;
+    dlBtn.style.opacity = "0.5";
     worker.postMessage({ type: 'generate', prompt: text });
 };
 
-// 3. Receive result from Worker
 worker.onmessage = (e) => {
-    const { type, message, blob } = e.data;
-    if (type === 'status') {
-        status.innerText = message;
-    } else if (type === 'done') {
+    const data = e.data;
+    if (data.type === 'progress') {
+        progressContainer.style.display = 'block';
+        progressBar.style.width = data.percent + '%';
+        status.innerText = `Downloading Model: ${data.percent}%`;
+    } else if (data.type === 'status') {
+        status.innerText = data.message;
+        if (data.message === 'Generating...') progressContainer.style.display = 'none';
+    } else if (data.type === 'done') {
         status.innerText = "Complete!";
         genBtn.disabled = false;
-        dlBtn.style.display = 'inline-block';
+        dlBtn.disabled = false;
+        dlBtn.style.opacity = "1";
+        dlBtn.style.cursor = "pointer";
+
+        if (currentImgURL) URL.revokeObjectURL(currentImgURL);
+        currentImgURL = URL.createObjectURL(data.blob);
         
         const img = new Image();
-        img.onload = () => {
-            canvas.style.display = 'block';
-            ctx.drawImage(img, 0, 0);
-        };
-        img.src = URL.createObjectURL(blob);
-        
+        img.onload = () => { canvas.style.display = 'block'; ctx.drawImage(img, 0, 0); };
+        img.src = currentImgURL;
+
         dlBtn.onclick = () => {
             const a = document.createElement('a');
-            a.href = img.src;
-            a.download = 'ai-image.png';
+            a.href = currentImgURL;
+            a.download = 'diego-ai-art.png';
             a.click();
         };
     }
