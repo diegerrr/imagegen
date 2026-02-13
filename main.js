@@ -1,54 +1,66 @@
-const worker = new Worker('./worker.js', { type: 'module' });
+// main.js - Corrected for the Multimodal Chat
+const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
+
 const history = document.getElementById('chat-history');
 const input = document.getElementById('chat-input');
 const sendBtn = document.getElementById('send-btn');
-const uploadBtn = document.getElementById('image-upload');
+const uploadInput = document.getElementById('image-upload');
+const folderBtn = document.getElementById('folder-btn');
 const status = document.getElementById('status');
 const progressBar = document.getElementById('progress-bar');
 const progressContainer = document.getElementById('progress-container');
 
 let pendingImage = null;
 
-// Add message to UI
+// Add message to UI (Handles text and generated AI images)
 function addMessage(role, content, isImage = false) {
     const div = document.createElement('div');
     div.className = `msg ${role}`;
+    
     if (isImage) {
         const img = new Image();
         img.src = URL.createObjectURL(content);
-        img.onclick = () => window.open(img.src);
+        img.style.maxWidth = "100%";
+        img.style.borderRadius = "8px";
+        img.style.marginTop = "10px";
+        
         div.innerHTML = `<strong>AI Art:</strong><br>`;
         div.appendChild(img);
-        // Add a download link automatically
+        
         const dl = document.createElement('a');
         dl.href = img.src;
-        dl.download = 'ai-art.png';
-        dl.innerText = ' [Download]';
-        dl.style.color = '#28a745';
+        dl.download = 'diego-ai-art.png';
+        dl.innerText = ' [Download PNG]';
+        dl.style.display = "block";
+        dl.style.color = "#28a745";
         div.appendChild(dl);
     } else {
         div.innerText = content;
     }
+    
     history.appendChild(div);
     history.scrollTop = history.scrollHeight;
 }
 
-// File Upload
-document.getElementById('upload-btn').onclick = () => uploadBtn.click();
-uploadBtn.onchange = (e) => {
+// 1. Folder Selection
+folderBtn.onclick = async () => {
+    try {
+        const handle = await window.showDirectoryPicker();
+        status.innerText = "Linked: " + handle.name;
+        worker.postMessage({ type: 'load_local', handle });
+    } catch (e) {
+        status.innerText = "Folder access denied or cancelled.";
+    }
+};
+
+// 2. Image Uploading
+document.getElementById('upload-btn').onclick = () => uploadInput.click();
+uploadInput.onchange = (e) => {
     pendingImage = e.target.files[0];
     status.innerText = `Image ready: ${pendingImage.name}`;
 };
 
-// Local Folder
-document.getElementById('folder-btn').onclick = async () => {
-    try {
-        const handle = await window.showDirectoryPicker();
-        worker.postMessage({ type: 'load_local', handle });
-    } catch (e) { status.innerText = "Cancelled."; }
-};
-
-// Send Message
+// 3. Send Message
 sendBtn.onclick = () => {
     const text = input.value.trim();
     if (!text && !pendingImage) return;
@@ -66,8 +78,10 @@ sendBtn.onclick = () => {
     pendingImage = null;
 };
 
+// 4. Handle Worker Responses
 worker.onmessage = (e) => {
     const data = e.data;
+    
     if (data.type === 'progress') {
         progressContainer.style.display = 'block';
         progressBar.style.width = data.percent + '%';
